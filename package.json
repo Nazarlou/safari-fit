@@ -1,0 +1,8 @@
+{
+  "name": "sable-and-sky-safari",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs"
+  }
+}
