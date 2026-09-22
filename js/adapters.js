@@ -1,6 +1,6 @@
-import {normalizeConciergeResponse} from './response-contract.js';
-import {packages} from './data.js';
-import {config} from './config.js';
+import {normalizeConciergeResponse,enforceBudget} from './response-contract.js?v=budget3';
+import {packages} from './data.js?v=budget3';
+import {config} from './config.js?v=budget3';
 const delay = () => new Promise(resolve => setTimeout(resolve,550));
 const clamp = (n,min,max) => Math.min(max,Math.max(min,n));
 export function validateTrip(t){
@@ -72,7 +72,7 @@ export class N8nChatAdapter extends MockTravelAdapter{
    const response=await fetch(this.webhookUrl,{method:'POST',mode:'cors',credentials:'omit',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:message.trim(),trip,sessionId:this.sessionId}),signal:controller.signal});
    if(!response.ok)throw new Error(response.status===404?'The concierge is not online yet. Please try again later.':response.status===429?'Too many messages. Please wait a minute.':'The concierge could not complete the search. Please try again.');
    let value;try{value=await response.json();}catch{throw new Error('The concierge returned an invalid response. Please try again.');}
-   const result=normalizeConciergeResponse(value);
+   const result=enforceBudget(normalizeConciergeResponse(value),interpretMessage(message,trip).budget);
    if(generation!==this.generation)throw new Error('Conversation reset. Please send your message again.');
    return result;
   }catch(error){if(error.name==='AbortError')throw new Error('The search took too long. Please try again.');if(error instanceof TypeError)throw new Error('Unable to connect to the concierge. Please check your connection and try again.');throw error;}finally{clearTimeout(timer);}
@@ -82,7 +82,7 @@ export class N8nChatAdapter extends MockTravelAdapter{
 export const travel=config.mode==='mock'?new MockTravelAdapter():config.mode==='n8n'?new N8nChatAdapter(config.webhookUrl):new ApiTravelAdapter(config.apiBase);
 export function matchPackages(trip){
  validateTrip(trip);
- return packages.filter(p=>trip.destination==='Both countries'||p.country===trip.destination).map(p=>{
+ return packages.filter(p=>p.price<=trip.budget&&(trip.destination==='Both countries'||p.country===trip.destination)).map(p=>{
   const budgetFit=p.price<=trip.budget;
   const durationGap=Math.abs(p.days-trip.days);
   const beachFit=trip.interests.includes('Beach')&&p.id==='coast';

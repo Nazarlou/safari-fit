@@ -12,3 +12,16 @@ export function normalizeConciergeResponse(value){
  });
  return {reply:text(value.reply),trip:{destination:t.destination,days:t.days,travelers:t.travelers,budget:t.budget,style:t.style,interests:t.interests.filter(x=>['Wildlife','Photography','Culture','Beach'].includes(x))},matches};
 }
+
+// Only explicitly comparable USD per-person prices qualify as budget matches.
+export function enforceBudget(result, ceiling){
+ const comparable=p=>{
+  const label=p.priceLabel.trim();
+  const m=label.match(/^(?:from\s+)?(?:USD\s*|US\$\s*)(\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?|\d+(?:\.\d{1,2})?)\s*(?:\/\s*(?:person|pp)|per\s+person|pp)\s*$/i);
+  return m?Number(m[1].replaceAll(',','')):null;
+ };
+ const matches=result.matches.filter(p=>{const price=comparable(p);return price!==null&&price>0&&price<=ceiling;});
+ const omitted=matches.length!==result.matches.length;
+ return {...result,trip:{...result.trip,budget:ceiling},matches,
+  reply:omitted?(matches.length?'These options have a stated USD per-person price within your budget. Other options were omitted because their price exceeded your budget or could not be compared safely.':'No returned package has a confirmed comparable USD per-person price within your budget. I have not increased your budget. We can adjust dates, duration or accommodation and search again.'):result.reply};
+}
