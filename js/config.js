@@ -1,4 +1,2 @@
-// Public configuration only. NEVER put credentials here.
-// mode: 'mock' (default), 'n8n' (connected chat only), 'api' (full future backend).
-// apiBase must point to YOUR secure gateway, never directly to MCP or a secret webhook.
-export const config = Object.freeze({mode:'mock',apiBase:''});
+// Public pilot webhook. No API keys or credentials belong in this file.
+export const config = Object.freeze({mode:'n8n',webhookUrl:'https://hadinzr.app.n8n.cloud/webhook/safari-concierge',apiBase:''});

@@ -62,11 +62,24 @@ export class ApiTravelAdapter{
 }
 // n8n mode connects only conversation discovery. Other surfaces remain labeled demos.
 export class N8nChatAdapter extends MockTravelAdapter{
- constructor(base){super();this.api=new ApiTravelAdapter(base);}
- async sendMessage(payload){const result=await this.api.sendMessage(payload);return normalizeConciergeResponse(result);}
- resetSession(){this.api.resetSession();}
+ constructor(webhookUrl){super();this.webhookUrl=webhookUrl;this.sessionId=crypto.randomUUID();this.generation=0;}
+ async sendMessage({message,trip}){
+  validateTrip(trip);
+  if(typeof message!=='string'||!message.trim()||message.length>1500)throw new Error('Please enter a message of up to 1,500 characters.');
+  if(!/^https:\/\//.test(this.webhookUrl))throw new Error('The concierge connection is not configured.');
+  const generation=this.generation,controller=new AbortController(),timer=setTimeout(()=>controller.abort(),90000);
+  try{
+   const response=await fetch(this.webhookUrl,{method:'POST',mode:'cors',credentials:'omit',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:message.trim(),trip,sessionId:this.sessionId}),signal:controller.signal});
+   if(!response.ok)throw new Error(response.status===404?'The concierge is not online yet. Please try again later.':response.status===429?'Too many messages. Please wait a minute.':'The concierge could not complete the search. Please try again.');
+   let value;try{value=await response.json();}catch{throw new Error('The concierge returned an invalid response. Please try again.');}
+   const result=normalizeConciergeResponse(value);
+   if(generation!==this.generation)throw new Error('Conversation reset. Please send your message again.');
+   return result;
+  }catch(error){if(error.name==='AbortError')throw new Error('The search took too long. Please try again.');if(error instanceof TypeError)throw new Error('Unable to connect to the concierge. Please check your connection and try again.');throw error;}finally{clearTimeout(timer);}
+ }
+ resetSession(){this.sessionId=crypto.randomUUID();this.generation++;}
 }
-export const travel=config.mode==='mock'?new MockTravelAdapter():config.mode==='n8n'?new N8nChatAdapter(config.apiBase):new ApiTravelAdapter(config.apiBase);
+export const travel=config.mode==='mock'?new MockTravelAdapter():config.mode==='n8n'?new N8nChatAdapter(config.webhookUrl):new ApiTravelAdapter(config.apiBase);
 export function matchPackages(trip){
  validateTrip(trip);
  return packages.filter(p=>trip.destination==='Both countries'||p.country===trip.destination).map(p=>{
